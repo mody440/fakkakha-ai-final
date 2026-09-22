@@ -1041,6 +1041,7 @@ function screenSessionShell(){
         <button class="round-btn" id="voiceInputBtn" title="اكتب بصوتك" aria-label="اكتب بصوتك">🎙️</button>
         <button class="round-btn" id="submitAnswerBtn">↩</button>
       </div>
+      <div id="voiceStatus" class="note-line" aria-live="polite"></div>
     </div>
   </div>`;
 }
@@ -1198,20 +1199,36 @@ async function runTurn(action, studentAnswer){
 
 function startVoiceInput(){
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRecognition){ alert('الإدخال الصوتي غير مدعوم في المتصفح ده.'); return; }
+  const status = document.getElementById('voiceStatus');
+  if(!SpeechRecognition){
+    if(status) status.textContent = 'الإملاء الصوتي غير متاح في هذا المتصفح. جرّب Chrome أو Safari عبر HTTPS.';
+    return;
+  }
   const input = document.getElementById('studentInput');
   const recognition = new SpeechRecognition();
-  recognition.lang = /[A-Za-z]/.test(input?.value || '') ? 'en-US' : 'ar-EG';
+  recognition.lang = session?.language === 'en' || /[A-Za-z]/.test(input?.value || '') ? 'en-US' : 'ar-EG';
   recognition.interimResults = true; recognition.continuous = false;
-  const btn = document.getElementById('voiceInputBtn'); if(btn) btn.textContent='⏺️';
+  const btn = document.getElementById('voiceInputBtn');
+  if(btn){ btn.textContent='⏺️'; btn.disabled = true; }
+  if(status) status.textContent = recognition.lang === 'en-US' ? 'Listening… speak now.' : 'جاري الاستماع… اتكلم الآن.';
   let finalText='';
   recognition.onresult = (event) => {
     finalText = Array.from(event.results).map(r=>r[0].transcript).join(' ');
     if(input) input.value = finalText;
   };
-  recognition.onerror = () => { if(btn) btn.textContent='🎙️'; };
-  recognition.onend = () => { if(btn) btn.textContent='🎙️'; };
-  recognition.start();
+  recognition.onerror = (event) => {
+    if(btn){ btn.textContent='🎙️'; btn.disabled = false; }
+    const message = event.error === 'not-allowed'
+      ? 'اسمح للمتصفح باستخدام الميكروفون ثم جرّب تاني.'
+      : event.error === 'no-speech' ? 'ماسمعتش صوت. اضغط الزر واتكلم بوضوح.' : `تعذر تشغيل الصوت (${event.error || 'unknown'}).`;
+    if(status) status.textContent = message;
+  };
+  recognition.onend = () => {
+    if(btn){ btn.textContent='🎙️'; btn.disabled = false; }
+    if(status && finalText) status.textContent = 'تم تحويل الصوت إلى نص. راجع الإجابة واضغط إرسال.';
+  };
+  try { recognition.start(); }
+  catch { if(btn){ btn.textContent='🎙️'; btn.disabled = false; } if(status) status.textContent = 'تعذر بدء الميكروفون. جرّب مرة أخرى.'; }
 }
 function speakText(text){
   if(!('speechSynthesis' in window)){ alert('قراءة النص بصوت غير مدعومة في المتصفح ده.'); return; }
