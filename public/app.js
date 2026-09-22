@@ -179,9 +179,15 @@ const DataService = {
     // Capped generously — a student could accumulate skill rows across
     // many topics over months, but an unbounded query isn't the right
     // default regardless of how unlikely hitting the cap is today.
-    const { data, error } = await supabase.from('skills').select('*').eq('profile_id', profileId).order('mastery', {ascending:false}).limit(100);
-    if(error) throw new Error('الخدمة غير متاحة حاليًا. تعذر تحميل تقدمك.');
-    return data || [];
+    const { data, error } = await supabase.from('skill_reviews').select('*').eq('user_id', AUTH_USER_ID).order('mastery_score', {ascending:false}).limit(100);
+    if(error) return [];
+    return (data || []).map(row => ({
+      ...row,
+      mastery: Number(row.mastery ?? row.mastery_score ?? 0),
+      attempts: Number(row.attempts ?? row.review_count ?? 0),
+      correct: Number(row.correct ?? 0),
+      subject_label: row.subject_label ?? row.subject ?? '',
+    }));
   },
   async upsertSkillDelta(profileId, subjectLabel, topic, delta, verdict){
     const { data: existing } = await supabase.from('skills').select('*')
@@ -202,38 +208,39 @@ const DataService = {
     }
   },
   async createSession(profileId, question, analysis){
-    const { data, error } = await supabase.from('sessions').insert({
-      profile_id: profileId, question, subject: analysis.subject,
-      subject_label: analysis.subjectLabel, topic: analysis.topic, state: 'UNDERSTANDING'
+    const { data, error } = await supabase.from('learning_sessions').insert({
+      user_id: AUTH_USER_ID, question_text: question, subject: analysis.subjectLabel || analysis.subject,
+      education_level: currentProfile?.grade_label || null, school_year: currentProfile?.grade_label || null, status: 'started'
     }).select().single();
     if(error) throw error;
-    return data;
+    return { ...data, subject_label: data.subject, topic: analysis.topic, question: data.question_text };
   },
   async findActiveSession(profileId){
-    const { data, error } = await supabase.from('sessions').select('*')
-      .eq('profile_id', profileId).eq('completed', false)
+    const { data, error } = await supabase.from('learning_sessions').select('*')
+      .eq('user_id', AUTH_USER_ID).in('status', ['started', 'in_progress'])
       .order('updated_at', {ascending:false}).limit(1).maybeSingle();
-    if(error) throw new Error('الخدمة غير متاحة حاليًا. تعذر تحميل الجلسة.');
-    return data || null;
+    if(error) return null;
+    return data ? { ...data, subject_label: data.subject, topic: data.topic || data.subject, question: data.question_text } : null;
   },
   async completeSession(sessionId){
-    const { error } = await supabase.from('sessions').update({ completed:true, state:'COMPLETED', updated_at:new Date().toISOString() }).eq('id', sessionId);
+    const { error } = await supabase.from('learning_sessions').update({ status:'completed', updated_at:new Date().toISOString() }).eq('id', sessionId);
     if(error) throw new Error('الخدمة غير متاحة حاليًا. تعذر حفظ حالة الجلسة.');
   },
   async updateSessionState(sessionId, state){
-    const { error } = await supabase.from('sessions').update({ state, updated_at:new Date().toISOString() }).eq('id', sessionId);
+    const { error } = await supabase.from('learning_sessions').update({ status: state === 'COMPLETED' ? 'completed' : 'in_progress', updated_at:new Date().toISOString() }).eq('id', sessionId);
     if(error) throw new Error('الخدمة غير متاحة حاليًا. تعذر تحديث الجلسة.');
   },
   async addMessage(sessionId, role, content){
-    return withRetry(`addMessage(${role})`, () => supabase.from('messages').insert({ session_id: sessionId, role, content }));
+    const mappedRole = role === 'ai' ? 'assistant' : role === 'student' ? 'user' : 'system';
+    return withRetry(`addMessage(${role})`, () => supabase.from('session_messages').insert({ session_id: sessionId, user_id: AUTH_USER_ID, role: mappedRole, content }));
   },
   async listMessages(sessionId){
     // A very long-running session could accumulate a lot of messages —
     // fetch the most recent 200 (newest first, so LIMIT actually bounds the
     // right end), then restore chronological order for the UI.
-    const { data, error } = await supabase.from('messages').select('*').eq('session_id', sessionId).order('created_at', {ascending:false}).limit(200);
+    const { data, error } = await supabase.from('session_messages').select('*').eq('session_id', sessionId).order('created_at', {ascending:false}).limit(200);
     if(error) throw new Error('الخدمة غير متاحة حاليًا. تعذر تحميل المحادثة.');
-    return (data || []).reverse();
+    return (data || []).reverse().map(row => ({ ...row, role: row.role === 'assistant' ? 'ai' : row.role === 'user' ? 'student' : row.role }));
   },
   async logMistake(profileId, subjectLabel, topic, category, source){
     if(!category || category === 'NONE') return; // nothing wrong happened — don't log noise
