@@ -30,7 +30,20 @@ try {
 // literal, so adding a language means adding a dictionary, not rewriting
 // this file. AI-generated content is intentionally NOT part of this system
 // (see lib/i18n.js header comment for why).
-const { t } = window.i18n;
+// A slow/cached mobile WebView must not take the whole app down if the plain
+// i18n script was delayed or blocked. Keep a tiny safe fallback until the
+// real dictionary is available.
+const t = window.i18n?.t || ((key, vars = {}) => {
+  const fallback = {
+    retry: 'حاول تاني',
+    app_name: 'فكّكها',
+    app_name_full: 'Fakkakha AI',
+    auth_setup_failed_title: 'مقدرناش نجهز حسابك',
+  };
+  let value = fallback[key] || key;
+  for (const [name, replacement] of Object.entries(vars)) value = value.replace(`{${name}}`, String(replacement));
+  return value;
+});
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -138,7 +151,7 @@ const DataService = {
     // A device realistically has a handful of profiles (siblings sharing a
     // phone) — capped defensively so this never becomes an unbounded query.
     const { data, error } = await supabase.from('profiles').select('*').order('created_at', {ascending:false}).limit(20);
-    if(error) throw new Error('الخدمة غير متاحة حاليًا. تعذر تحميل ملفك.');
+    if(error) throw new Error(error.message || 'الخدمة غير متاحة حاليًا. تعذر تحميل ملفك.');
     return data || [];
   },
   async createProfile(name, gradeRaw, age = null, subject = '', language = 'ar'){

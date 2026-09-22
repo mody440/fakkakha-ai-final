@@ -165,8 +165,5 @@ function setLocale(locale) {
 // via require() from Node (for tests), same pattern as the rest of this
 // codebase's shared modules.
 const i18n = { t, setLocale, STRINGS };
-if (typeof module === 'object' && module.exports) {
-  module.exports = i18n;
-} else if (typeof window !== 'undefined') {
-  window.i18n = i18n;
-}
+if (typeof window !== 'undefined') window.i18n = i18n;
+if (typeof module === 'object' && module.exports) module.exports = i18n;
