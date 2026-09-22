@@ -170,6 +170,12 @@ test('guardrails: adds bounded safety notices for sensitive domains', () => {
   assert.match(domainSafetyNotice('رياضيات'), /تعليمي/);
 });
 
+test('guardrails: infers English when the learner writes in Latin script', () => {
+  const { inferLanguage } = require('../lib/guardrails');
+  assert.equal(inferLanguage('Solve this math problem'), 'en');
+  assert.equal(inferLanguage('حل المسألة دي'), 'ar');
+});
+
 test('RAG fallback: only returns positively matched curriculum rows', () => {
   const source = require('../lib/rag');
   assert.equal(typeof source.retrieveCurriculumContext, 'function');

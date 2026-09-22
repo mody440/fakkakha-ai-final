@@ -272,9 +272,9 @@ const DataService = {
 // The frontend NEVER calls Gemini directly — every call goes through our own
 // backend under /api, which holds the real key server-side.
 const AIService = {
-  async post(path, body){
+  async post(path, body, timeoutMs = 25000){
     const controller = new AbortController();
-    const t = setTimeout(()=>controller.abort(), 25000);
+    const t = setTimeout(()=>controller.abort(), timeoutMs);
     try{
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(API_BASE + path, {
@@ -297,7 +297,7 @@ const AIService = {
       throw new Error(err.message || 'حصل خطأ في الشبكة.');
     }
   },
-  analyzeQuestion(question, gradeLabel){ return this.post('/api/analyze-question', { question, gradeLabel }); },
+  analyzeQuestion(question, gradeLabel, age, profileSubject, language){ return this.post('/api/analyze-question', { question, gradeLabel, age, profileSubject, language }); },
   sessionTurn(payload){ return this.post('/api/session-turn', payload); },
   async sessionTurnStream(payload, onDelta){
     const { data: { session: authSession } } = await supabase.auth.getSession();
@@ -339,7 +339,7 @@ const AIService = {
     } finally { clearTimeout(timeout); }
   },
   detectMistake(question, attempt){ return this.post('/api/detect-mistake', { question, attempt }); },
-  analyzeImage(imageBase64, mimeType){ return this.post('/api/analyze-image', { imageBase64, mimeType }); },
+  analyzeImage(imageBase64, mimeType){ return this.post('/api/analyze-image', { imageBase64, mimeType }, 45000); },
   research(query, subject, gradeLabel){ return this.post('/api/research', { query, subject, gradeLabel, count: 6 }); },
   generateExam(payload){ return this.post('/api/generate-exam', payload); },
   scoreExam(payload){ return this.post('/api/score-exam', payload); },
@@ -650,7 +650,7 @@ async function handleImageAnalyze(){
 }
 // Resizes to a max dimension and re-encodes as JPEG before sending — per the
 // "compress images before processing, avoid huge base64 payloads" requirement.
-function compressImage(file, maxDim = 1600, quality = 0.82){
+function compressImage(file, maxDim = 1024, quality = 0.72){
   return new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();
@@ -1009,14 +1009,17 @@ app.addEventListener('click', (e) => { if(e.target.closest('#examBackHome')) go(
 /* ============================ session engine ============================ */
 async function startSession(questionText, analysis){
   const row = await DataService.createSession(currentProfile.id, questionText, analysis);
+  const englishQuestion = /[A-Za-z]/.test(String(questionText || '')) && !/[\u0600-\u06FF]/.test(String(questionText || ''));
   session = {
     id: row.id, subject: analysis.subject, subjectLabel: analysis.subjectLabel,
-    topic: analysis.topic, gradeLabel: currentProfile.grade_label, history: []
+    topic: analysis.topic, gradeLabel: currentProfile.grade_label, language: englishQuestion ? 'en' : (currentProfile.language || 'ar'), history: []
   };
   AIService.trackEvent('session_started', { subject: analysis.subject, topic: analysis.topic });
   render(screenSessionShell());
   updateStateBar('UNDERSTANDING');
-  addAiMsg(`تمام، السؤال ده في ${session.subjectLabel} — موضوع "${session.topic}". خلينا نفككها سوا خطوة خطوة.`);
+  addAiMsg(session.language === 'en'
+    ? `This question is about ${session.subjectLabel}, specifically "${session.topic}". Let’s break it down step by step.`
+    : `تمام، السؤال ده في ${session.subjectLabel} — موضوع "${session.topic}". خلينا نفككها سوا خطوة خطوة.`);
   await DataService.addMessage(session.id, 'ai', session.history[session.history.length-1].text);
   await runTurn('start', null);
 }
@@ -1140,7 +1143,7 @@ async function runTurn(action, studentAnswer){
     const payload = {
       subject: session.subject, subjectLabel: session.subjectLabel, topic: session.topic,
       gradeLabel: session.gradeLabel, age: currentProfile?.age ?? null,
-      profileSubject: currentProfile?.subject || '', language: currentProfile?.language || 'ar',
+      profileSubject: currentProfile?.subject || '', language: session.language || currentProfile?.language || 'ar',
       history: session.history, action, studentAnswer,
       sessionId: session.id, turnId
     };
