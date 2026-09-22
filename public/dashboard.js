@@ -12,10 +12,14 @@ form.addEventListener('submit', async (event) => {
     const response = await fetch('/api/metrics', { headers: { 'x-admin-key': key, Accept: 'application/json' } });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || 'تعذر تحميل المقاييس.');
+    const endpoints = Array.isArray(data.endpoints) ? data.endpoints : [];
+    const totalRequests = endpoints.reduce((sum, item) => sum + Number(item.requests || 0), 0);
+    const totalErrors = endpoints.reduce((sum, item) => sum + (Number(item.requests || 0) * Number(item.errorRate || 0) / 100), 0);
+    const totalDuration = endpoints.reduce((sum, item) => sum + (Number(item.requests || 0) * Number(item.avgDurationMs || 0)), 0);
     const cards = [
-      ['إجمالي الطلبات', data.totalRequests ?? data.total ?? 0],
-      ['نسبة الأخطاء', data.errorRate ?? data.errors ?? 0],
-      ['متوسط الزمن', data.averageDurationMs ?? data.avgDurationMs ?? 0],
+      ['إجمالي الطلبات', data.totalRequests ?? data.total ?? totalRequests],
+      ['نسبة الأخطاء', data.errorRate ?? data.errors ?? (totalRequests ? `${(totalErrors / totalRequests * 100).toFixed(1)}%` : '0%')],
+      ['متوسط الزمن', data.averageDurationMs ?? data.avgDurationMs ?? (totalRequests ? `${Math.round(totalDuration / totalRequests)} ms` : '0 ms')],
       ['آخر تحديث', new Date().toLocaleString()]
     ];
     grid.innerHTML = cards.map(([label,value]) => `<div class="card metric-card"><div class="muted fs-13">${esc(label)}</div><strong>${esc(value)}</strong></div>`).join('');
