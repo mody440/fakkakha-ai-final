@@ -152,15 +152,25 @@ const DataService = {
     // phone) — capped defensively so this never becomes an unbounded query.
     const { data, error } = await supabase.from('profiles').select('*').order('created_at', {ascending:false}).limit(20);
     if(error) throw new Error(error.message || 'الخدمة غير متاحة حاليًا. تعذر تحميل ملفك.');
-    return data || [];
+    // The production schema uses display_name/education_level/school_year;
+    // older UI code used name/grade_label. Normalize both shapes at the edge.
+    return (data || []).map(profile => ({
+      ...profile,
+      name: String(profile.name ?? profile.display_name ?? 'طالب').trim() || 'طالب',
+      grade_label: String(profile.grade_label ?? profile.school_year ?? profile.education_level ?? 'غير محدد').trim() || 'غير محدد',
+    }));
   },
   async createProfile(name, gradeRaw, age = null, subject = '', language = 'ar'){
     const gradeLabel = GradeService.normalize(gradeRaw);
     const { data, error } = await supabase.from('profiles')
-      .insert({ name, age: age ? Number(age) : null, grade_label: gradeLabel, subject: subject || null, language })
+      .insert({ display_name: String(name || '').trim(), education_level: gradeLabel, school_year: gradeLabel, major: subject || null })
       .select().single();
     if(error) throw error;
-    return data;
+    return {
+      ...data,
+      name: String(data.display_name || name || 'طالب').trim() || 'طالب',
+      grade_label: String(data.school_year || data.education_level || gradeLabel).trim() || 'غير محدد',
+    };
   },
   async listSkills(profileId){
     // Capped generously — a student could accumulate skill rows across
