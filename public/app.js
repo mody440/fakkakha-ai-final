@@ -76,6 +76,19 @@ async function ensureAuth(){
   AUTH_EMAIL = null;
 }
 
+async function getFreshAuthSession(){
+  let { data: { session } } = await supabase.auth.getSession();
+  if(!session){
+    await ensureAuth();
+    ({ data: { session } } = await supabase.auth.getSession());
+  }
+  if(!session?.access_token) throw new Error('انتهت جلسة الدخول. أعد فتح التطبيق مرة واحدة.');
+  AUTH_USER_ID = session.user.id;
+  AUTH_IS_ANONYMOUS = session.user.is_anonymous ?? true;
+  AUTH_EMAIL = session.user.email || null;
+  return session;
+}
+
 /* ------------------------- optional account linking ------------------------ */
 // A student's progress is tied to their anonymous auth id by default (no
 // signup needed). If they want that SAME progress to follow them to a new
@@ -272,11 +285,13 @@ const DataService = {
 // The frontend NEVER calls Gemini directly — every call goes through our own
 // backend under /api, which holds the real key server-side.
 const AIService = {
-  async post(path, body, timeoutMs = 25000){
-    const controller = new AbortController();
-    const t = setTimeout(()=>controller.abort(), timeoutMs);
+  async post(path, body, timeoutMs = 60000){
+    let retriedAuth = false;
+    while(true){
+      const controller = new AbortController();
+      const t = setTimeout(()=>controller.abort(), timeoutMs);
     try{
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getFreshAuthSession();
       const res = await fetch(API_BASE + path, {
         method:'POST',
         headers:{
@@ -288,28 +303,48 @@ const AIService = {
       clearTimeout(t);
       if(!res.ok){
         const errBody = await res.json().catch(()=>({}));
+        if(res.status === 401 && !retriedAuth){
+          retriedAuth = true;
+          await ensureAuth();
+          continue;
+        }
         throw new Error(errBody.message || 'الخدمة غير متاحة حاليًا');
       }
       return await res.json();
     } catch(err){
       clearTimeout(t);
+      if(err.message?.includes('انتهت جلسة') && !retriedAuth){
+        retriedAuth = true;
+        await ensureAuth();
+        continue;
+      }
       if(err.name === 'AbortError') throw new Error('الاتصال أخد وقت طويل، جرب تاني.');
       throw new Error(err.message || 'حصل خطأ في الشبكة.');
+    }
     }
   },
   analyzeQuestion(question, gradeLabel, age, profileSubject, language){ return this.post('/api/analyze-question', { question, gradeLabel, age, profileSubject, language }); },
   sessionTurn(payload){ return this.post('/api/session-turn', payload); },
   async sessionTurnStream(payload, onDelta){
-    const { data: { session: authSession } } = await supabase.auth.getSession();
+    let retriedAuth = false;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 40000);
+    const timeout = setTimeout(() => controller.abort(), 70000);
     try {
+      const authSession = await getFreshAuthSession();
       const res = await fetch(API_BASE + '/api/session-turn-stream', {
         method:'POST',
         headers:{'Content-Type':'application/json', ...(authSession?.access_token ? {'Authorization':'Bearer '+authSession.access_token} : {})},
         body:JSON.stringify(payload), signal:controller.signal
       });
-      if(!res.ok) throw new Error((await res.json().catch(()=>({}))).message || 'الخدمة مش متاحة دلوقتي');
+      if(!res.ok){
+        const errBody = await res.json().catch(()=>({}));
+        if(res.status === 401 && !retriedAuth){
+          retriedAuth = true;
+          await ensureAuth();
+          return this.sessionTurnStream(payload, onDelta);
+        }
+        throw new Error(errBody.message || 'الخدمة مش متاحة دلوقتي');
+      }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '', donePayload = null;
@@ -339,7 +374,7 @@ const AIService = {
     } finally { clearTimeout(timeout); }
   },
   detectMistake(question, attempt){ return this.post('/api/detect-mistake', { question, attempt }); },
-  analyzeImage(imageBase64, mimeType){ return this.post('/api/analyze-image', { imageBase64, mimeType }, 45000); },
+  analyzeImage(imageBase64, mimeType){ return this.post('/api/analyze-image', { imageBase64, mimeType }, 60000); },
   research(query, subject, gradeLabel){ return this.post('/api/research', { query, subject, gradeLabel, count: 6 }); },
   generateExam(payload){ return this.post('/api/generate-exam', payload); },
   scoreExam(payload){ return this.post('/api/score-exam', payload); },
