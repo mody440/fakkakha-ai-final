@@ -29,12 +29,12 @@ mock.method(geminiModule, 'callGemini', async () => geminiResponse);
 
 // Required AFTER the mocks above are installed, so their internal
 // `const { admin } = require('../lib/supabaseAdmin')` picks up the mock.
-const analyzeQuestion = require('../api/analyze-question');
-const analyzeImage = require('../api/analyze-image');
-const detectMistake = require('../api/detect-mistake');
-const generateExam = require('../api/generate-exam');
-const sessionTurn = require('../api/session-turn');
-const scoreExam = require('../api/score-exam');
+const analyzeQuestion = require('../lib/endpoints/analyze-question');
+const analyzeImage = require('../lib/endpoints/analyze-image');
+const detectMistake = require('../lib/endpoints/detect-mistake');
+const generateExam = require('../lib/endpoints/generate-exam');
+const sessionTurn = require('../lib/endpoints/session-turn');
+const scoreExam = require('../lib/endpoints/score-exam');
 
 function fakeReqRes(body, headers = {}) {
   const req = { method: 'POST', body, headers };

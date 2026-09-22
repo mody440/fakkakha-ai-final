@@ -9,7 +9,7 @@ const endpoints = [
 
 test('all API endpoint modules are present and loadable', () => {
   for (const name of endpoints) {
-    const handler = require(`../api/${name}.js`);
+    const handler = require(`../lib/endpoints/${name}.js`);
     assert.equal(typeof handler, 'function', `${name} must export a handler`);
   }
 });
