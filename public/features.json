@@ -1,0 +1,37 @@
+{
+  "benchmark": {
+    "cases": 50,
+    "modes": [
+      "routing",
+      "full"
+    ],
+    "measures": [
+      "subjectAccuracy",
+      "groundedRubricAccuracy",
+      "judgeGroundedRate",
+      "judgeHallucinationRate",
+      "averageJudgeScore"
+    ]
+  },
+  "rag": {
+    "provider": "Supabase pgvector",
+    "retrieval": "embedding + keyword fallback"
+  },
+  "streaming": {
+    "protocol": "SSE"
+  },
+  "guardrails": [
+    "PII redaction",
+    "prompt-injection detection",
+    "input validation"
+  ],
+  "voice": [
+    "SpeechRecognition",
+    "SpeechSynthesis"
+  ],
+  "offline": {
+    "strategy": "hybrid",
+    "localModel": "Xenova/paraphrase-multilingual-MiniLM-L12-v2",
+    "fallback": "deterministic curriculum cards"
+  }
+}

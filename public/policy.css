@@ -1,0 +1,6 @@
+body{ font-family:"Segoe UI","Tahoma",Arial,sans-serif; background:#0A0D18; color:#EEF0FA; max-width:720px; margin:0 auto; padding:32px 20px; line-height:1.9; }
+h1{ font-size:22px; margin-bottom:6px; }
+h2{ font-size:17px; margin-top:28px; color:#4FD8EB; }
+p, li{ font-size:14.5px; color:#C7CAE0; }
+.flag{ background:rgba(244,112,138,0.08); border:1px solid rgba(244,112,138,0.3); border-radius:12px; padding:14px 16px; margin:20px 0; color:#F7A8B8; font-size:13.5px; }
+a{ color:#4FD8EB; }

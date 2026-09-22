@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install
+      - name: Syntax-check every backend file
+        run: |
+          for f in api/*.js lib/*.js; do
+            node --check "$f" || exit 1
+          done
+      - name: Syntax-check every frontend file
+        run: |
+          # app.js is an ES module (import/top-level await style) but has a
+          # plain .js extension, so `node --check` on it directly would try
+          # CommonJS parsing and could give a false pass/fail. Copying to
+          # .mjs forces Node to parse it as a module, same as the manual
+          # check used throughout development — this closes the exact gap
+          # that let two real syntax/logic bugs through unnoticed earlier.
+          cp public/app.js /tmp/app_ci_check.mjs
+          node --check /tmp/app_ci_check.mjs || exit 1
+          node --check public/lib/i18n.js || exit 1
+          node --check public/push.js || exit 1
+          node --check public/sw.js || exit 1
+      - name: Validate JSON config files
+        run: |
+          for f in package.json vercel.json capacitor.config.json public/manifest.json; do
+            python3 -m json.tool "$f" > /dev/null || exit 1
+          done
+      - name: Run tests
+        run: npm test

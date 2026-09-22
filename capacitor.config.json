@@ -1,0 +1,9 @@
+{
+  "appId": "ai.fakkakha.app",
+  "appName": "فكّكها AI",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

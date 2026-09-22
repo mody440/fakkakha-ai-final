@@ -1,0 +1,30 @@
+{
+  "name": "fakkakha-ai",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "test": "node --test tests/*.test.js",
+    "cap:add:android": "npx cap add android",
+    "cap:add:ios": "npx cap add ios",
+    "cap:sync": "npx cap sync",
+    "check": "node scripts/check.js",
+    "build": "node scripts/build.js",
+    "test:e2e": "playwright test -c e2e/playwright.config.js",
+    "load:test": "k6 run loadtest/k6.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "@capacitor/core": "^6.1.0",
+    "@capacitor/cli": "^6.1.0",
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/ios": "^6.1.0",
+    "@capacitor/push-notifications": "^6.0.0",
+    "@playwright/test": "^1.55.0"
+  }
+}

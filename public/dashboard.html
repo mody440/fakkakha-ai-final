@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Fakkakha AI — Dashboard</title><link rel="stylesheet" href="/style.css">
+</head>
+<body><main id="dashboard" class="screen" style="max-width:760px;margin:auto">
+  <header class="topbar"><div class="brand"><div class="mark">ف</div><div class="name">لوحة المقاييس <span>Fakkakha AI</span></div></div></header>
+  <div class="banner info">المفتاح يُستخدم في الذاكرة المؤقتة لهذه الصفحة فقط ولا يُحفظ في الكود أو عنوان الرابط.</div>
+  <form id="metricsForm" class="card"><label class="field-lbl" for="adminKey">مفتاح المقاييس الإداري</label><input id="adminKey" type="password" autocomplete="off" required><button class="btn btn-primary btn-block mt-14">تحميل المقاييس</button></form>
+  <div id="metricsStatus" aria-live="polite" class="mt-14"></div><section id="metricsGrid" class="metrics-grid" aria-live="polite"></section>
+</main><script src="/dashboard.js"></script></body></html>
