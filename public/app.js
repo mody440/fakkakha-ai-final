@@ -190,20 +190,19 @@ const DataService = {
     }));
   },
   async upsertSkillDelta(profileId, subjectLabel, topic, delta, verdict){
-    const { data: existing } = await supabase.from('skills').select('*')
-      .eq('profile_id', profileId).eq('subject_label', subjectLabel).eq('topic', topic).maybeSingle();
+    const { data: existing } = await supabase.from('skill_reviews').select('*')
+      .eq('user_id', AUTH_USER_ID).eq('subject', subjectLabel).eq('topic', topic).maybeSingle();
     if(existing){
-      const mastery = Math.max(0.05, Math.min(1, existing.mastery + delta));
-      return withRetry('upsertSkillDelta(update)', () => supabase.from('skills').update({
-        mastery, attempts: existing.attempts + 1,
-        correct: existing.correct + (verdict === 'correct' ? 1 : 0),
-        last_practiced: new Date().toISOString()
+      const mastery = Math.max(0.05, Math.min(1, Number(existing.mastery_score ?? 0.4) + delta));
+      return withRetry('upsertSkillDelta(update)', () => supabase.from('skill_reviews').update({
+        mastery_score: mastery, review_count: Number(existing.review_count || 0) + 1,
+        last_result: verdict === 'correct', next_review_at: new Date(Date.now() + 86400000).toISOString()
       }).eq('id', existing.id));
     } else {
-      return withRetry('upsertSkillDelta(insert)', () => supabase.from('skills').insert({
-        profile_id: profileId, subject_label: subjectLabel, topic,
-        mastery: Math.max(0.05, Math.min(1, 0.4 + delta)),
-        attempts: 1, correct: verdict === 'correct' ? 1 : 0
+      return withRetry('upsertSkillDelta(insert)', () => supabase.from('skill_reviews').insert({
+        user_id: AUTH_USER_ID, subject: subjectLabel, topic,
+        mastery_score: Math.max(0.05, Math.min(1, 0.4 + delta)),
+        review_count: 1, last_result: verdict === 'correct', next_review_at: new Date(Date.now() + 86400000).toISOString()
       }));
     }
   },
@@ -244,15 +243,18 @@ const DataService = {
   },
   async logMistake(profileId, subjectLabel, topic, category, source){
     if(!category || category === 'NONE') return; // nothing wrong happened — don't log noise
-    return withRetry('logMistake', () => supabase.from('mistake_log').insert({ profile_id: profileId, subject_label: subjectLabel, topic, category, source }));
+    return withRetry('logMistake', () => supabase.from('skill_evidence').insert({
+      user_id: AUTH_USER_ID, subject: subjectLabel, topic,
+      evidence_type: category, result: false, confidence: 0.8, source
+    }));
   },
   async getMistakeBreakdown(profileId){
-    const { data, error } = await supabase.from('mistake_log').select('category, topic').eq('profile_id', profileId).order('created_at', {ascending:false}).limit(500);
+    const { data, error } = await supabase.from('skill_evidence').select('evidence_type, topic').eq('user_id', AUTH_USER_ID).eq('result', false).order('created_at', {ascending:false}).limit(500);
     if(error) throw new Error('الخدمة غير متاحة حاليًا. تعذر تحميل تحليل الأخطاء.');
     const rows = data || [];
     const byCategory = {}, byTopic = {};
     for(const r of rows){
-      byCategory[r.category] = (byCategory[r.category] || 0) + 1;
+      byCategory[r.evidence_type] = (byCategory[r.evidence_type] || 0) + 1;
       byTopic[r.topic] = (byTopic[r.topic] || 0) + 1;
     }
     const sortEntries = (obj) => Object.entries(obj).sort((a,b) => b[1]-a[1]);
