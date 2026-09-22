@@ -162,6 +162,14 @@ test('guardrails: does not flag ordinary study questions as injection', () => {
   assert.equal(detectPromptInjection('what is the ignore command in git, and how do I use a .gitignore file?'), false);
 });
 
+test('guardrails: adds bounded safety notices for sensitive domains', () => {
+  const { domainSafetyNotice } = require('../lib/guardrails');
+  assert.match(domainSafetyNotice('طب وأعراض التنفس'), /طبيب|طوارئ/);
+  assert.match(domainSafetyNotice('قانون عقد إيجار'), /قانونية|محام/);
+  assert.match(domainSafetyNotice('هندسة كهرباء'), /مهندس|سلامة/);
+  assert.match(domainSafetyNotice('رياضيات'), /تعليمي/);
+});
+
 test('RAG fallback: only returns positively matched curriculum rows', () => {
   const source = require('../lib/rag');
   assert.equal(typeof source.retrieveCurriculumContext, 'function');

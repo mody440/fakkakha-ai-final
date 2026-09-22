@@ -138,6 +138,7 @@ const STRINGS = {
     account_link_btn: 'اربط حسابي بالإيميل ده',
     account_have_account: 'عندك حساب اتربط قبل كده على جهاز تاني؟',
     account_signin_btn: 'سجّل دخول واسترجع تقدمي',
+    account_reset_btn: 'نسيت الباسورد؟ ابعتلي رسالة استرجاع',
     account_linked_banner: 'حسابك مرتبط بالإيميل: {email}. تقدرك متابعة من أي جهاز بتسجيل الدخول بنفس الإيميل والباسورد.',
 
     // misc

@@ -99,6 +99,12 @@ async function signInWithExistingEmail(email, password){
   AUTH_IS_ANONYMOUS = data.user.is_anonymous ?? false;
   AUTH_EMAIL = data.user.email || null;
 }
+async function sendPasswordReset(email){
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${location.origin}/?reset=1`
+  });
+  if(error) throw new Error(error.message || 'مقدرناش نبعت رسالة الاسترجاع.');
+}
 
 /* ------------------------------ grade parsing ------------------------------ */
 const GradeService = {
@@ -546,15 +552,16 @@ async function screenAccount(){
       <div class="banner info">${t('account_anon_banner')}</div>
       <div class="card mb-12">
         <div class="field"><label class="field-lbl">${t('account_email_label')}</label><input type="text" id="linkEmail" placeholder="you@example.com"></div>
-        <div class="field mb-12"><label class="field-lbl">${t('account_password_label')}</label><input type="text" id="linkPassword" placeholder="••••••"></div>
+        <div class="field mb-12"><label class="field-lbl">${t('account_password_label')}</label><input type="password" id="linkPassword" autocomplete="new-password" placeholder="••••••"></div>
         <button class="btn btn-primary btn-block" id="linkAccountBtn">${t('account_link_btn')}</button>
         <div id="linkStatus"></div>
       </div>
       <p class="sub mb-10">${t('account_have_account')}</p>
       <div class="card">
         <div class="field"><label class="field-lbl">${t('account_email_label')}</label><input type="text" id="signinEmail" placeholder="you@example.com"></div>
-        <div class="field mb-12"><label class="field-lbl">${t('account_password_label')}</label><input type="text" id="signinPassword" placeholder="••••••"></div>
+        <div class="field mb-12"><label class="field-lbl">${t('account_password_label')}</label><input type="password" id="signinPassword" autocomplete="current-password" placeholder="••••••"></div>
         <button class="btn btn-ghost btn-block" id="signinAccountBtn">${t('account_signin_btn')}</button>
+        <button class="btn btn-ghost btn-block mt-10" id="resetPasswordBtn">${t('account_reset_btn')}</button>
         <div id="signinStatus"></div>
       </div>
     ` : `
@@ -565,6 +572,7 @@ async function screenAccount(){
 app.addEventListener('click', async (e) => {
   if(e.target.closest('#linkAccountBtn')) return handleLinkAccount();
   if(e.target.closest('#signinAccountBtn')) return handleSigninExisting();
+  if(e.target.closest('#resetPasswordBtn')) return handlePasswordReset();
 });
 async function handleLinkAccount(){
   const email = document.getElementById('linkEmail').value.trim();
@@ -590,6 +598,18 @@ async function handleSigninExisting(){
     await signInWithExistingEmail(email, password);
     currentProfile = null;
     await go(screenProfiles);
+  } catch(err){
+    statusEl.innerHTML = `<div class="banner mt-10">${escapeHtml(err.message)}</div>`;
+  }
+}
+async function handlePasswordReset(){
+  const email = document.getElementById('signinEmail')?.value.trim();
+  const statusEl = document.getElementById('signinStatus');
+  if(!email){ statusEl.innerHTML = '<div class="banner mt-10">اكتب الإيميل الأول عشان نبعتلك رسالة الاسترجاع</div>'; return; }
+  statusEl.innerHTML = '<div class="banner info mt-10"><span class="spinner"></span> بيبعت رسالة الاسترجاع...</div>';
+  try{
+    await sendPasswordReset(email);
+    statusEl.innerHTML = '<div class="banner info mt-10">اتبعثت رسالة استرجاع على الإيميل. افتحها وحدد باسورد جديد.</div>';
   } catch(err){
     statusEl.innerHTML = `<div class="banner mt-10">${escapeHtml(err.message)}</div>`;
   }
