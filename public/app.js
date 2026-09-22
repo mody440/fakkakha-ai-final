@@ -163,7 +163,10 @@ const DataService = {
   async createProfile(name, gradeRaw, age = null, subject = '', language = 'ar'){
     const gradeLabel = GradeService.normalize(gradeRaw);
     const { data, error } = await supabase.from('profiles')
-      .insert({ display_name: String(name || '').trim(), education_level: gradeLabel, school_year: gradeLabel, major: subject || null })
+      // The production RLS policy is profiles_self: auth.uid() = id.
+      // Use the anonymous user's UUID as the profile primary key and upsert,
+      // so retrying after a network error remains safe and idempotent.
+      .upsert({ id: AUTH_USER_ID, display_name: String(name || '').trim(), education_level: gradeLabel, school_year: gradeLabel, major: subject || null }, { onConflict: 'id' })
       .select().single();
     if(error) throw error;
     return {
@@ -452,7 +455,8 @@ async function createProfile(){
     AIService.trackEvent('profile_created');
     await selectProfile(p);
   } catch(err){
-    document.getElementById('profileErr').innerHTML = `<div class="banner">مقدرناش نحفظ البروفايل. تأكد إن SUPABASE_URL و SUPABASE_ANON_KEY متظبطين في أول الملف، وإنك شغّلت schema.sql على مشروع Supabase، وإن عندك اتصال إنترنت.</div>`;
+    console.error('[fakkakha:profile-save-failed]', err);
+    document.getElementById('profileErr').innerHTML = `<div class="banner">مقدرناش نحفظ البروفايل: ${escapeHtml(err?.message || 'خطأ غير معروف')}. جرّب تاني.</div>`;
   }
 }
 async function selectProfile(p){
